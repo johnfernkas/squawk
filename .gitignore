@@ -7,7 +7,7 @@ DerivedData/
 *.dSYM.zip
 *.dSYM
 
-# Build
+# Build output
 build/
 
 # macOS
