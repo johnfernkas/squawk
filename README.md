@@ -5,8 +5,8 @@ Squawk is a macOS menubar app that discovers and monitors [MCP (Model Context Pr
 ## Features
 
 - **Auto-discovery** -- Scans configuration files for 11 supported hosts and merges them into a unified list, deduplicating servers that appear in more than one tool.
-- **Live health monitoring** -- Polls every 10 seconds. Stdio servers are checked via `pgrep`; HTTP servers receive a `tools/list` JSON-RPC request.
-- **Menubar status indicator** -- Green when all servers are healthy, red when any server is down, yellow while checks are pending.
+- **Live health monitoring** -- Polls every 10 seconds. Stdio servers are validated by resolving their command in PATH; HTTP servers receive a `tools/list` JSON-RPC request.
+- **Menubar status indicator** -- Monochrome when all servers are healthy (quiet by design), yellow when any server is down or unavailable, red with a pulse animation when all servers are down.
 - **Server detail popover** -- Click the menubar icon to see each server's status, transport type (stdio / HTTP), and which hosts reference it.
 - **Tool introspection** -- Expand any server row to fetch and display its available MCP tools via the MCP Swift SDK.
 
