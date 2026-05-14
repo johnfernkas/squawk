@@ -4,7 +4,7 @@ Squawk is a macOS menubar app that discovers and monitors [MCP (Model Context Pr
 
 ## Features
 
-- **Auto-discovery** -- Scans configuration files for 11 supported hosts and merges them into a unified list, deduplicating servers that appear in more than one tool.
+- **Auto-discovery** -- Scans configuration files for 11 supported hosts, detects Claude Code plugins that expose MCP servers, and merges everything into a unified list, deduplicating servers that appear in more than one tool.
 - **Live health monitoring** -- Polls every 10 seconds. Stdio servers are validated by resolving their command in PATH; HTTP servers receive a `tools/list` JSON-RPC request.
 - **Menubar status indicator** -- Monochrome when all servers are healthy (quiet by design), yellow when any server is down or unavailable, red with a pulse animation when all servers are down.
 - **Server detail popover** -- Click the menubar icon to see each server's status, transport type (stdio / HTTP), and which hosts reference it.
@@ -25,6 +25,7 @@ Squawk is a macOS menubar app that discovers and monitors [MCP (Model Context Pr
 | Zed | `context_servers` | `~/.config/zed/settings.json` |
 | Amazon Q | `mcpServers` | `~/.aws/amazonq/mcp.json` |
 | JetBrains IDEs | `mcpServers` | `~/Library/Application Support/JetBrains/*/mcp.json` |
+| Claude Code Plugins | `mcpServers` | `~/.claude/plugins/installed_plugins.json` (via marketplace manifest) |
 
 ## How It Works
 
@@ -32,7 +33,7 @@ Squawk is a macOS menubar app that discovers and monitors [MCP (Model Context Pr
 2. **Health polling** -- A background task runs every 10 seconds. For each server it spawns a concurrent check:
    - *stdio* servers: resolves the command in `PATH` and, for Docker-based servers, verifies the daemon is running via `docker info`. Returns **Configured** if valid, an error otherwise.
    - *HTTP* servers: sends a `POST` with a `tools/list` JSON-RPC payload and treats any 2xx response as **Healthy**. Tools returned in that response are cached for display.
-3. **Tool loading** -- After the first health check, Squawk eagerly fetches tools from every server in the background. HTTP tools come from the health check response. Stdio tools are fetched by spawning the server process and performing an MCP handshake via the MCP Swift SDK's `StdioTransport`.
+3. **Tool loading** -- After the first health check, Squawk eagerly fetches tools from every server in the background. HTTP tools come from the health check response. Stdio tools are fetched by spawning the server process and performing an MCP handshake via the MCP Swift SDK's `StdioTransport`. If the fetch fails, the server is marked **Unavailable** and retries stop until the user manually reloads.
 4. **Status display** -- The menubar icon updates after each polling cycle and animates when a problem is detected. Clicking it opens a searchable tool browser grouped by server. Right-clicking a server reveals options to reload its tools or jump directly to its config file.
 
 ## Tech Stack
@@ -48,26 +49,36 @@ Squawk is a macOS menubar app that discovers and monitors [MCP (Model Context Pr
 squawk/
   squawkApp.swift      App entry point; sets activation policy to .accessory (no dock icon)
   AppDelegate.swift    NSStatusItem setup, popover management, status icon updates
-  MCPConfig.swift      Config source definitions, JSON parsing, server/transport models
+  MCPConfig.swift      Config source definitions, JSON parsing, server/transport models,
+                       ClaudeCodePluginLoader, CustomSourceLoader
   MCPMonitor.swift     Health polling loop, MCP protocol communication, tool fetching
   PopoverView.swift    SwiftUI popover UI (server list, tool rows, empty state)
+  AboutView.swift      About window
+  SettingsView.swift   Settings window (launch at login, global shortcut info)
 ```
 
 ## Getting Started
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/johnfernkas/squawk.git
-   cd squawk
-   ```
-2. Open `squawk.xcodeproj` in Xcode 15 or later.
-3. Add the MCP Swift SDK package dependency:
+### Build and install (no Xcode required)
+
+```bash
+git clone https://github.com/johnfernkas/squawk.git
+cd squawk
+make install
+```
+
+This builds a release `.app` and copies it to `/Applications/Squawk.app`. On first launch, macOS Gatekeeper will block the unsigned app — right-click → Open → Open to bypass it once.
+
+### Develop in Xcode
+
+1. Clone the repository and open `squawk.xcodeproj` in Xcode 15 or later.
+2. Add the MCP Swift SDK package dependency:
    - File > Add Package Dependencies
    - Enter `https://github.com/modelcontextprotocol/swift-sdk`
-4. Disable the App Sandbox:
+3. Disable the App Sandbox:
    - Select the squawk target > Signing & Capabilities
-   - Remove the App Sandbox capability (Squawk needs filesystem access to read config files and process spawning for `pgrep` and stdio servers)
-5. Build and run (Cmd+R). The Squawk icon will appear in your menubar.
+   - Remove the App Sandbox capability (required for filesystem access and process spawning)
+4. Build and run (Cmd+R). The Squawk icon will appear in your menubar.
 
 ## Requirements
 
@@ -86,7 +97,7 @@ squawk/
 
 MIT License
 
-Copyright (c) 2025 John Fernkas
+Copyright (c) 2026 John Fernkas
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
